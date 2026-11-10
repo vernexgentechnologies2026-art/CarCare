@@ -7,7 +7,7 @@ import { defineConfig, devices } from '@playwright/test';
  *    Role Switcher) at a phone and a desktop breakpoint.
  *  - "headers-mock": security headers, and every screen under the CSP.
  *  - "headers-production": the real production profile (Supabase, dev tools
- *    off) — no dev tools or mock banners, loads under the CSP.
+ *    off) â€” no dev tools or mock banners, loads under the CSP.
  *
  *   npm run test:e2e
  * Set CARCARE_E2E=app or CARCARE_E2E=headers to run one half (less memory).
@@ -23,10 +23,12 @@ export default defineConfig({
   // One worker: this machine has little free memory.
   workers: 1,
   fullyParallel: false,
-  retries: 0,
+  // CI: one retry, so a one-off runner hiccup is reported as flaky instead of failing the build.
+  retries: process.env.CI ? 1 : 0,
   timeout: 60_000,
   expect: { timeout: 10_000 },
-  reporter: [['list']],
+  // On GitHub, failures also appear as annotations on the commit and pull request.
+  reporter: process.env.CI ? [['github'], ['list']] : [['list']],
   use: { trace: 'retain-on-failure' },
   projects: [
     ...(app
