@@ -1,0 +1,42 @@
+# CarCare CI (Master Task Document §26.4): install, lint, typecheck, unit +
+# database tests, production-build check, build, Playwright end-to-end.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      # UI freeze check + Vitest (unit, integration, database/RLS on PGlite)
+      - run: npm test
+      # Fails if dev tools, mock data, demo credentials or secret keys reach the bundle
+      - run: npm run verify:prod-build
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-traces
+          path: test-results/
+          retention-days: 7

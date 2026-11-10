@@ -1,0 +1,45 @@
+# CarCare photo gateway — Cloudflare Worker for the private R2 photo bucket.
+#
+#   Production:  npx wrangler deploy
+#   Staging:     npx wrangler deploy --env staging
+#
+# Secrets are NOT stored here. Set them per environment (each command prompts):
+#   npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY [--env staging]
+#   npx wrangler secret put URL_SIGNING_SECRET        [--env staging]   (random, ≥ 32 chars, different per env)
+#
+# Staging and production use separate buckets, Supabase projects and secrets:
+# staging can never read or delete production photos.
+name = "carcare-photo-gateway"
+main = "src/index.ts"
+compatibility_date = "2024-10-01"
+
+[[r2_buckets]]
+binding = "PHOTOS"
+bucket_name = "carcare-photos"
+
+[vars]
+# Public values only (project URL and anon key are not secrets). Fill in before deploying.
+SUPABASE_URL = ""
+SUPABASE_ANON_KEY = ""
+# Exact production origin(s), comma-separated, e.g. "https://app.<client-domain>"
+ALLOWED_ORIGINS = ""
+
+# Daily 60-day retention cleanup, 02:30 IST.
+[triggers]
+crons = ["0 21 * * *"]
+
+[env.staging]
+name = "carcare-photo-gateway-staging"
+
+[[env.staging.r2_buckets]]
+binding = "PHOTOS"
+bucket_name = "carcare-photos-staging"
+
+[env.staging.vars]
+SUPABASE_URL = ""
+SUPABASE_ANON_KEY = ""
+# e.g. "https://staging.<client-domain>"; add http://localhost:5174 only while debugging
+ALLOWED_ORIGINS = ""
+
+[env.staging.triggers]
+crons = ["0 21 * * *"]

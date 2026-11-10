@@ -1,0 +1,10 @@
+# Security headers for the deployed site (Cloudflare Pages / Netlify `_headers` format).
+# Master Task Document §18.6, §26.2. Before go-live, replace *.workers.dev with the
+# photo gateway's exact host if it is served from a custom domain.
+/*
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: geolocation=(), microphone=(), camera=(self), payment=(self "https://checkout.razorpay.com" "https://api.razorpay.com")
+  Content-Security-Policy: default-src 'self'; script-src 'self' https://checkout.razorpay.com; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.workers.dev https://api.razorpay.com https://lumberjack.razorpay.com; img-src 'self' data: blob: https://*.workers.dev; frame-src https://api.razorpay.com https://checkout.razorpay.com; style-src 'self' 'unsafe-inline'; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests

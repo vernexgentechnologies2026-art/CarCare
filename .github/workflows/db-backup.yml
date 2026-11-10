@@ -1,0 +1,67 @@
+# Daily encrypted database backup to a private Cloudflare R2 bucket.
+# Agreement: daily backups, 30-day retention (enforced by an R2 lifecycle rule
+# on the bucket — see docs/STAGING_DEPLOYMENT.md §7). Restore steps: same doc.
+#
+# Repository secrets (Settings → Secrets and variables → Actions, environment "production"):
+#   SUPABASE_DB_URL        session-pooler connection string (postgres role), from Supabase → Connect
+#   BACKUP_PASSPHRASE      long random passphrase; store a copy offline with the client's designated contact
+#   R2_ACCOUNT_ID, R2_BACKUP_ACCESS_KEY_ID, R2_BACKUP_SECRET_ACCESS_KEY
+#                          R2 API token scoped to Object Read & Write on the backup bucket ONLY
+#   R2_BACKUP_BUCKET       e.g. carcare-backups (private, separate from carcare-photos)
+name: Database backup
+
+on:
+  schedule:
+    - cron: '30 20 * * *' # 02:00 IST, outside wash hours
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 30
+    steps:
+      - name: Install PostgreSQL 17 client tools
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list >/dev/null
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client-17
+
+      - name: Dump (schema + data), compress, encrypt
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          umask 077
+          stamp=$(date -u +%Y-%m-%dT%H%M%SZ)
+          mkdir -p backup
+          # Application schemas in full, INCLUDING grants/revokes: without them a restore would fall back
+          # to Supabase's default grants and reopen tables to anon/authenticated (see Phase 6 hardening).
+          # Supabase-managed auth as data only (users + identities).
+          pg_dump "$SUPABASE_DB_URL" --schema=public --schema=private --no-owner --file=backup/schema-and-data.sql
+          pg_dump "$SUPABASE_DB_URL" --data-only --table=auth.users --table=auth.identities --file=backup/auth-data.sql
+          tar -czf "carcare-db-$stamp.tar.gz" -C backup .
+          gpg --batch --yes --pinentry-mode loopback --passphrase-fd 3 --symmetric --cipher-algo AES256 \
+              --output "carcare-db-$stamp.tar.gz.gpg" "carcare-db-$stamp.tar.gz" 3<<<"$BACKUP_PASSPHRASE"
+          rm -rf backup "carcare-db-$stamp.tar.gz"
+          echo "FILE=carcare-db-$stamp.tar.gz.gpg" >> "$GITHUB_ENV"
+          ls -l carcare-db-*.gpg
+
+      - name: Upload to private R2 bucket
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_BACKUP_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_BACKUP_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          ENDPOINT: https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
+          BUCKET: ${{ secrets.R2_BACKUP_BUCKET }}
+        run: |
+          set -euo pipefail
+          aws s3 cp "$FILE" "s3://$BUCKET/daily/$FILE" --endpoint-url "$ENDPOINT" --only-show-errors
+          # Fail loudly if the object is not there (monitoring relies on this job's status).
+          aws s3 ls "s3://$BUCKET/daily/$FILE" --endpoint-url "$ENDPOINT"

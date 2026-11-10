@@ -1,0 +1,447 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>CarCare UAT Checklist</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+  /* Layout: one reading column (≈ 60rem) with a sticky progress bar; each test is a row card with its controls. */
+  :root {
+    --bg: #f6f8fb;
+    --surface: #ffffff;
+    --ink: #0f172a;
+    --muted: #526177;
+    --line: #dbe2ec;
+    --brand: #1d4ed8;
+    --brand-soft: #e8efff;
+    --pass: #047857;
+    --pass-soft: #e3f6ee;
+    --fail: #b91c1c;
+    --fail-soft: #fdecec;
+    --warn: #8a5300;
+    --warn-soft: #fff4dc;
+    --font-body: "IBM Plex Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
+    --font-mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0b1220; --surface: #121b2d; --ink: #e6ecf5; --muted: #9aa8bd; --line: #24324a;
+      --brand: #7aa2ff; --brand-soft: #18284a; --pass: #4fd1a1; --pass-soft: #0f2b24;
+      --fail: #ff8a8a; --fail-soft: #3a1717; --warn: #f3c46b; --warn-soft: #33270f;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0b1220; --surface: #121b2d; --ink: #e6ecf5; --muted: #9aa8bd; --line: #24324a;
+    --brand: #7aa2ff; --brand-soft: #18284a; --pass: #4fd1a1; --pass-soft: #0f2b24;
+    --fail: #ff8a8a; --fail-soft: #3a1717; --warn: #f3c46b; --warn-soft: #33270f;
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font: 400 15px/1.6 var(--font-body);
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+  }
+  body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--surface); }
+  .wrap { max-width: 60rem; margin: 0 auto; padding-block: 28px 64px; display: grid; gap: 28px; }
+  h1, h2, h3 { margin: 0; line-height: 1.25; text-wrap: balance; }
+  h1 { font-size: clamp(1.6rem, 4vw, 2.1rem); font-weight: 700; letter-spacing: -0.01em; }
+  h2 { font-size: 1.3rem; font-weight: 700; }
+  h3 { font-size: 1rem; font-weight: 600; }
+  p { margin: 0; max-width: 65ch; }
+  a { color: var(--brand); }
+  .mono, .plate { font-family: var(--font-mono); font-weight: 500; }
+  .plate { letter-spacing: 0.02em; white-space: nowrap; }
+  .eyebrow { font-size: 0.75rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--brand); }
+  .muted { color: var(--muted); }
+  .stack { display: grid; gap: 12px; }
+
+  /* Header */
+  header.intro { display: grid; gap: 10px; }
+  .meta { display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: 0.875rem; color: var(--muted); }
+  .meta b { color: var(--ink); font-weight: 600; }
+  .note { border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 14px 16px; font-size: 0.925rem; }
+
+  /* Sticky progress */
+  .progress {
+    position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
+    padding: 12px 14px; display: grid; gap: 10px; box-shadow: 0 6px 18px -14px rgba(15, 23, 42, 0.45);
+  }
+  .progress-top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; }
+  .tallies { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 0.875rem; font-variant-numeric: tabular-nums; }
+  .tally { display: inline-flex; align-items: center; gap: 6px; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--line); }
+  .dot.pass { background: var(--pass); } .dot.fail { background: var(--fail); }
+  .bar { height: 8px; border-radius: 99px; background: var(--line); overflow: hidden; display: flex; }
+  .bar span { height: 100%; transition: width 0.25s ease; }
+  .bar .p { background: var(--pass); } .bar .f { background: var(--fail); }
+  .jump { display: flex; flex-wrap: wrap; gap: 6px; }
+  .jump a { font-size: 0.8rem; font-weight: 600; text-decoration: none; padding: 4px 10px; border-radius: 99px; background: var(--brand-soft); color: var(--brand); }
+
+  /* Tables */
+  .table-scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; font-size: 0.9rem; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  tr:last-child td { border-bottom: 0; }
+  th { font-size: 0.75rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+
+  /* Sections & tests */
+  section.part { display: grid; gap: 14px; scroll-margin-top: 150px; }
+  .part-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 12px; }
+  .part-count { font-size: 0.85rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .test {
+    display: grid; grid-template-columns: 3.4rem minmax(0, 1fr); gap: 4px 14px;
+    background: var(--surface); border: 1px solid var(--line); border-left-width: 4px; border-radius: 10px; padding: 14px 16px;
+  }
+  .test.is-pass { border-left-color: var(--pass); }
+  .test.is-fail { border-left-color: var(--fail); }
+  .tid { font-family: var(--font-mono); font-weight: 600; color: var(--brand); padding-top: 1px; }
+  .tbody { min-width: 0; display: grid; gap: 10px; }
+  .row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px 18px; }
+  .label { font-size: 0.72rem; font-weight: 600; letter-spacing: 0.07em; text-transform: uppercase; color: var(--muted); margin-bottom: 2px; }
+  .when { display: inline-block; font-size: 0.75rem; font-weight: 600; color: var(--warn); background: var(--warn-soft); border-radius: 6px; padding: 1px 7px; margin-bottom: 4px; }
+  .controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .seg button {
+    font: 600 0.85rem/1 var(--font-body); padding: 9px 14px; min-height: 40px; border: 0; background: var(--surface); color: var(--muted); cursor: pointer;
+  }
+  .seg button + button { border-left: 1px solid var(--line); }
+  .seg button[aria-pressed="true"].pass { background: var(--pass-soft); color: var(--pass); }
+  .seg button[aria-pressed="true"].fail { background: var(--fail-soft); color: var(--fail); }
+  .seg button:focus-visible, .btn:focus-visible, textarea:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+  select, textarea, input[type="text"], input[type="date"] {
+    font: 400 0.9rem/1.4 var(--font-body); color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px;
+  }
+  textarea { width: 100%; min-height: 64px; resize: vertical; }
+  .btn {
+    font: 600 0.875rem/1 var(--font-body); padding: 10px 14px; min-height: 40px; border-radius: 8px; cursor: pointer;
+    border: 1px solid var(--brand); background: var(--brand); color: #fff;
+  }
+  .btn.ghost { background: transparent; color: var(--brand); }
+  .btn.danger { border-color: var(--fail); background: transparent; color: var(--fail); }
+  .status { font-size: 0.85rem; color: var(--pass); min-height: 1.2em; }
+
+  ol.known { margin: 0; padding-left: 1.25rem; display: grid; gap: 8px; max-width: 70ch; }
+  .report { display: grid; gap: 12px; }
+  .fields { display: flex; flex-wrap: wrap; gap: 10px 14px; }
+  .fields label { display: grid; gap: 4px; font-size: 0.8rem; font-weight: 600; color: var(--muted); }
+  #report-text { font-family: var(--font-mono); font-size: 0.8rem; min-height: 180px; white-space: pre; }
+  .confirm { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 0.875rem; }
+  footer { font-size: 0.8rem; color: var(--muted); }
+
+  @media (max-width: 640px) {
+    .row { grid-template-columns: minmax(0, 1fr); }
+    .test { grid-template-columns: minmax(0, 1fr); }
+    section.part { scroll-margin-top: 190px; }
+  }
+  @media (prefers-reduced-motion: reduce) { .bar span { transition: none; } }
+</style>
+
+</head>
+<body>
+<div class="wrap">
+  <header class="intro">
+    <span class="eyebrow">User acceptance test · staging</span>
+    <h1>CarCare UAT Checklist</h1>
+    <p>Work through CarCare as a <b>resident</b>, a <b>cleaner</b> and an <b>admin</b>. Each test says what to do and what you should see. Mark it <b>Pass</b> or <b>Fail</b>, and add a note for anything that looks wrong. When you finish, copy the feedback report at the bottom and send it to Vernex.</p>
+    <div class="meta">
+      <span>Build <b class="mono">1.0.0-rc.1</b></span>
+      <span>Site: <b>the staging link sent by Vernex</b></span>
+      <span>Your answers are saved in this browser only</span>
+    </div>
+  </header>
+
+  <div class="progress" aria-label="Progress">
+    <div class="progress-top">
+      <div class="tallies" aria-live="polite">
+        <span class="tally"><span class="dot pass"></span><span id="n-pass">0</span>&nbsp;passed</span>
+        <span class="tally"><span class="dot fail"></span><span id="n-fail">0</span>&nbsp;failed</span>
+        <span class="tally"><span class="dot"></span><span id="n-left">0</span>&nbsp;not yet tested</span>
+      </div>
+      <div class="jump">
+        <a href="#start">Start</a><a href="#resident">Resident</a><a href="#cleaner">Cleaner</a><a href="#admin">Admin</a><a href="#general">General</a><a href="#report">Report</a>
+      </div>
+    </div>
+    <div class="bar" aria-hidden="true"><span class="p" id="bar-pass" style="width:0"></span><span class="f" id="bar-fail" style="width:0"></span></div>
+  </div>
+
+  <section class="part" id="start">
+    <h2>Before you start</h2>
+    <div class="note stack">
+      <p>Everything on the staging site is <b>test data</b>: the people, cars and phone numbers are made up, and payments run in Razorpay <b>test mode</b>, so no real money moves. Please don't enter real customer details.</p>
+      <p><b>You will need</b> a phone (Android with Chrome, or iPhone with Safari) for the resident and cleaner tests, and a laptop for the admin tests. Some tests are done on a second day, because a wash can only be recorded on its scheduled day; they're marked <span class="when">Day 2</span>.</p>
+      <p>To switch roles, sign out (top right) and sign in with another account. On one device, use a private or incognito window for the second role.</p>
+    </div>
+    <h3>Test accounts</h3>
+    <p class="muted">Sign in with the mobile number and password. Vernex sends the passwords separately; they're never written here.</p>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Role</th><th>Mobile number</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td>Admin</td><td class="mono">90000 00001</td><td>Staging Admin</td></tr>
+          <tr><td>Cleaner A</td><td class="mono">90000 00101</td><td>Covers Block A</td></tr>
+          <tr><td>Cleaner B</td><td class="mono">90000 00102</td><td>Covers Block B</td></tr>
+          <tr><td>Resident One</td><td class="mono">90000 01001</td><td>Block A, daily plan, car <span class="plate">TN-01-UA-0001</span>, one missed wash two days ago</td></tr>
+          <tr><td>Resident Two</td><td class="mono">90000 01002</td><td>Block B, Mon · Wed · Fri plan, car <span class="plate">TN-01-UA-0002</span></td></tr>
+          <tr><td>New resident</td><td class="mono">90000 03001</td><td>You create this one in test R1 (and <span class="mono">90000 03002</span> in A3)</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <div id="parts"></div>
+
+  <section class="part" id="known">
+    <h2>Known items in this build</h2>
+    <p class="muted">These are already logged. You don't need to report them.</p>
+    <ol class="known">
+      <li><b>Payment captions.</b> After a payment, the result title still reads "Payment successful (simulated)". The invoice page and admin dashboard also mention simulated payments. The payments themselves are real Razorpay test-mode transactions. The screens are frozen, so these captions change only with your written approval.</li>
+      <li><b>Retaking a photo.</b> If a cleaner retakes a photo, they should wait until the new size ("Compressed: … KB") appears before tapping Confirm. Tapping too early saves the previous photo. The fix is also waiting for your approval.</li>
+      <li><b>Vehicle reference photo.</b> The job screen shows "Photo unavailable" where a reference photo of the car would appear; reference photos aren't stored in this version.</li>
+      <li><b>"Earlier months" summaries</b> in the resident gallery stay empty until the monthly roll-up feature is added. All detailed history is shown.</li>
+      <li><b>Accounts.</b> New cleaner and admin accounts, and password resets, are done by Vernex support on request. There's no in-app screen for them in this version.</li>
+    </ol>
+  </section>
+
+  <section class="part report" id="report">
+    <h2>Feedback report</h2>
+    <p>This report lists every test you marked <b>Fail</b>, plus any notes you left on passing tests. Copy it into an e-mail (or a spreadsheet) to your Vernex contact.</p>
+    <div class="fields">
+      <label for="reviewer">Your name<input type="text" id="reviewer" autocomplete="name"></label>
+      <label for="review-date">Date<input type="date" id="review-date"></label>
+    </div>
+    <textarea id="report-text" readonly aria-label="Feedback report"></textarea>
+    <div class="controls">
+      <button class="btn" type="button" id="copy-report">Copy report</button>
+      <span class="status" id="copy-status" role="status"></span>
+    </div>
+    <div class="note stack">
+      <h3>Timeline from the agreement</h3>
+      <p>Please report issues in writing within <b>7 working days</b> of receiving the build. If no written response arrives within <b>5 working days</b>, the build is treated as accepted. Production go-live happens only after your <b>written approval</b>, on a date agreed with you.</p>
+      <h3>Sign-off</h3>
+      <p>When you're satisfied, reply to Vernex with this sentence, plus your name and the date:</p>
+      <p class="mono" id="signoff">UAT complete — approved for production, release 1.0.0-rc.1</p>
+      <div class="controls"><button class="btn ghost" type="button" id="copy-signoff">Copy sign-off sentence</button><span class="status" id="signoff-status" role="status"></span></div>
+    </div>
+    <div class="controls">
+      <button class="btn danger" type="button" id="clear">Clear my answers</button>
+      <span class="confirm" id="clear-confirm" hidden>Clear every result and note in this browser?
+        <button class="btn danger" type="button" id="clear-yes">Yes, clear</button>
+        <button class="btn ghost" type="button" id="clear-no">Keep them</button>
+      </span>
+    </div>
+  </section>
+
+  <footer>CarCare · prepared by Vernex Gen Technologies for the client's acceptance review. All accounts, cars and phone numbers on staging are fictional.</footer>
+</div>
+
+<script>
+(() => {
+  const PARTS = [
+    { id: 'resident', title: 'Part 1 — Resident', device: 'Use a phone', tests: [
+      ['R1', null, 'On the sign-in screen, choose to register. Fill in owner name, mobile 90000 03001, a made-up registration (e.g. TN-10-ZZ-0101), make & model, car size, block A, a flat number, a parking slot and a password (8+ characters with a letter and a number). Submit.', 'A confirmation that the registration was received. Leaving any field empty or invalid shows a clear message next to that field.'],
+      ['R2', null, 'Sign in as the new resident (90000 03001).', 'You are taken to "Registration Under Review". You cannot open the dashboard or other resident pages yet.'],
+      ['R3', 'After A2', 'Sign in again as 90000 03001, after the admin has approved you.', 'You now reach the resident dashboard.'],
+      ['R4', null, 'Open Packages & schedule.', 'Only packages that fit your car size are listed, with the four schedules (Daily; Mon · Wed · Fri; Tue · Fri; Thursday only). Prices are placeholders (₹1–₹8).'],
+      ['R5', null, 'Choose a package.', 'The choice is saved and the dashboard shows the package. Washes start from tomorrow.'],
+      ['R6', null, 'Sign in as Resident One (90000 01001). Look at the dashboard.', 'The 13-wash milestone gauge shows completed washes this month out of 13, the remaining count and a percentage. The next wash date is shown.'],
+      ['R7', 'After C3', 'Refresh Resident One’s dashboard after the cleaner completes the wash.', 'The completed count goes up by exactly 1.'],
+      ['R8', null, 'Open Wash photos. Open the newest photo.', 'The after-wash photo is shown with the date only. No time of day and no cleaner name appear anywhere for residents.'],
+      ['R9', null, 'Open Request Reschedule. Pick the missed wash (two days ago), choose a new date in the next 14 days, give a reason, submit.', 'The request appears under "Your requests" as pending. The 13-wash count does not change.'],
+      ['R10', 'After A9', 'Look at your requests and dashboard after the admin approves the reschedule.', 'The request shows as approved. The missed wash shows as Rescheduled. The count still does not change; it only goes up when the makeup wash is done with a photo.'],
+      ['R11', null, 'Open Billing / Pay Dues.', 'Outstanding balance, this month’s invoice and payment history.'],
+      ['R12', null, 'Tap Pay now on the invoice. Choose UPI. In the Razorpay window, use the test UPI ID success@razorpay.', 'Payment completes, the invoice shows Paid, and the payment appears in the history once.'],
+      ['R13', null, 'Sign in as Resident Two (90000 01002), tap Pay now, and in Razorpay use failure@razorpay (or close the Razorpay window).', 'A clear "payment failed" or "cancelled" result. The invoice is still due. Trying again works.'],
+      ['R14', null, 'While signed in as a resident, type /admin/dashboard at the end of the site address.', 'A "You don’t have access" page. Residents can never see admin screens.'],
+    ]},
+    { id: 'cleaner', title: 'Part 2 — Cleaner', device: 'Use a phone', tests: [
+      ['C1', null, 'Sign in as Cleaner A (90000 00101).', 'Today’s jobs with a sticky "X / Y Completed" counter, filter chips (All / Pending / Completed / Vehicle Not Present), and for each car its plate, slot, block/flat and a call button. Only Block A cars assigned to Cleaner A appear.'],
+      ['C2', null, 'Open Resident One’s job (TN-01-UA-0001), then Complete Wash & Upload Photo.', '"Confirm Wash Completed" stays disabled until a photo is attached.'],
+      ['C3', null, 'Take a photo with the camera (or choose one). Wait until the size appears ("Compressed: … KB"), then tap Confirm Wash Completed.', 'The size shown is 150 KB or less. You return to Today’s jobs and the job shows Completed. The counter goes up by one.'],
+      ['C4', null, 'Tap the call button on a job.', 'The phone dialler opens with the resident’s number.'],
+      ['C5', 'Day 2', 'Open Resident One’s job and choose Vehicle Not Present. Add an optional note and confirm.', 'The dialog warns that this does not count as a wash. After confirming, the job shows Vehicle Not Present. Resident One’s completed count does not go up.'],
+      ['C6', 'Day 2', 'Try to open the same job again to complete it.', 'It is already recorded and can’t be changed.'],
+      ['C7', null, 'Open Schedule, Customers and Targets.', 'Schedule: cars per day for the next week, by block. Customers: only your assigned residents, searchable. Targets: this month’s washes against the goal, with Vehicle Not Present counted separately.'],
+      ['C8', null, 'Sign in as Cleaner B (90000 00102).', 'Cleaner B sees only Block B cars, and none of Cleaner A’s jobs.'],
+      ['C9', 'Reschedule date', 'On the day of the approved reschedule (from R9), sign in as Cleaner A.', 'The makeup wash appears on that day’s list, marked as a makeup wash. Completing it with a photo adds one to Resident One’s count.'],
+    ]},
+    { id: 'admin', title: 'Part 3 — Admin', device: 'Use a laptop or desktop', tests: [
+      ['A1', null, 'Sign in as Admin (90000 00001).', 'Operations dashboard with total customers, today’s washes, completion rate, cleaners active, outstanding invoices and a 14-day wash trend.'],
+      ['A2', null, 'Customers → Pending Approvals. Open the new registration from R1 and Approve, choosing Cleaner A under "Assign cleaner".', 'The registration leaves the pending tab and the resident is now active.'],
+      ['A3', null, 'Register another made-up resident (repeat R1 with 90000 03002), then Reject it with a reason.', 'The resident sees "Registration not approved" with your reason when they sign in.'],
+      ['A4', null, 'Customers → All Residents. Search by name, flat or registration. Use the block, status and cleaner filters.', 'Results update; lists load page by page.'],
+      ['A5', null, 'Open a resident and use Pause service, then Resume service.', 'Status changes. A paused resident gets no new washes scheduled.'],
+      ['A6', null, 'Cleaners → Reassign cleaner. Move Block B from Cleaner B to Cleaner A, then move it back.', 'The roster and block coverage update. Cleaner A temporarily sees the Block B cars.'],
+      ['A7', null, 'Packages. Edit a package’s price and description. Then try to switch off a car size that subscribed cars use.', 'The edit saves. Removing a size still in use is refused with an explanation.'],
+      ['A8', null, 'Schedules → Master calendar. Move between months; filter by block.', 'Each day shows scheduled, completed, not-present and rescheduled counts.'],
+      ['A9', null, 'Schedules → Reschedule queue. Approve Resident One’s request from R9 (add a note).', 'The request moves to approved, and the resident sees your note.'],
+      ['A10', null, 'Payments. Filter by Paid / Outstanding / Overdue. Use Manual status override to mark Resident Two’s invoice "Paid (e.g. cash received at the office)", with a reason.', 'The invoice shows Paid. The reason is recorded.'],
+      ['A11', null, 'Photos. Filter by date, block and cleaner.', 'Every after-wash photo with its wash date, recorded time and cleaner name (admins only; residents never see these).'],
+      ['A12', null, 'Activity log. Filter by action and role.', 'Every change made during these tests is listed, with who did it and when. Entries can’t be edited or deleted.'],
+      ['A13', null, 'Try opening /cleaner/today as admin, and an admin page as a cleaner.', 'Each role sees only its own area.'],
+    ]},
+    { id: 'general', title: 'Part 4 — General', device: 'Any device', tests: [
+      ['G1', null, 'Use the resident and cleaner screens on a phone.', 'Easy to use: nothing cut off, no sideways scrolling, buttons big enough to tap.'],
+      ['G2', null, 'Look at the site address.', 'It starts with https:// and the browser shows a padlock.'],
+      ['G3', null, 'Look around every screen.', 'No "review build", "mock", "demo" or developer panel appears anywhere (except the known payment captions below).'],
+      ['G4', null, 'Sign out, then press Back.', 'The previous user’s data is not shown.'],
+    ]},
+  ];
+
+  const KEY = 'carcare-uat-1.0.0-rc.1';
+  let state = {};
+  try { state = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch { state = {}; }
+  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch { /* storage unavailable: answers live for this visit */ } };
+  const entry = (id) => (state[id] ??= { result: '', note: '', severity: 'Normal' });
+  const el = (tag, attrs = {}, text) => {
+    const node = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, v);
+    if (text != null) node.textContent = text;
+    return node;
+  };
+
+  const syncers = [];
+  const host = document.getElementById('parts');
+  for (const part of PARTS) {
+    const section = el('section', { class: 'part', id: part.id });
+    const head = el('div', { class: 'part-head' });
+    head.append(el('h2', {}, part.title), el('span', { class: 'part-count', 'data-part': part.id }));
+    section.append(head, el('p', { class: 'muted' }, part.device));
+    for (const [id, when, todo, expect] of part.tests) {
+      const card = el('article', { class: 'test', id: `t-${id}`, 'aria-labelledby': `tid-${id}` });
+      const body = el('div', { class: 'tbody' });
+      const row = el('div', { class: 'row' });
+      const doCol = el('div');
+      if (when) doCol.append(el('span', { class: 'when' }, when));
+      doCol.append(el('div', { class: 'label' }, 'What to do'), el('p', {}, todo));
+      const seeCol = el('div');
+      seeCol.append(el('div', { class: 'label' }, 'What you should see'), el('p', {}, expect));
+      row.append(doCol, seeCol);
+
+      const controls = el('div', { class: 'controls' });
+      const seg = el('div', { class: 'seg', role: 'group', 'aria-label': `Result for ${id}` });
+      const pass = el('button', { type: 'button', class: 'pass', 'aria-pressed': 'false' }, 'Pass');
+      const fail = el('button', { type: 'button', class: 'fail', 'aria-pressed': 'false' }, 'Fail');
+      seg.append(pass, fail);
+      const sevLabel = el('label', { for: `sev-${id}`, class: 'muted' }, 'How serious');
+      const sev = el('select', { id: `sev-${id}` });
+      for (const s of ['Critical', 'High', 'Normal']) sev.append(el('option', { value: s }, s));
+      const sevWrap = el('span', { class: 'controls' });
+      sevWrap.append(sevLabel, sev);
+      controls.append(seg, sevWrap);
+
+      const note = el('textarea', { id: `note-${id}`, 'aria-label': `Notes for ${id}`, placeholder: 'Notes: what happened, which screen, anything unexpected' });
+      body.append(row, controls, note);
+      card.append(el('div', { class: 'tid', id: `tid-${id}` }, id), body);
+      section.append(card);
+
+      const sync = () => {
+        const e = entry(id);
+        pass.setAttribute('aria-pressed', String(e.result === 'pass'));
+        fail.setAttribute('aria-pressed', String(e.result === 'fail'));
+        card.classList.toggle('is-pass', e.result === 'pass');
+        card.classList.toggle('is-fail', e.result === 'fail');
+        sevWrap.hidden = e.result !== 'fail';
+        sev.value = e.severity;
+        if (note.value !== e.note) note.value = e.note;
+      };
+      const choose = (r) => { const e = entry(id); e.result = e.result === r ? '' : r; save(); sync(); refresh(); };
+      pass.addEventListener('click', () => choose('pass'));
+      fail.addEventListener('click', () => choose('fail'));
+      sev.addEventListener('change', () => { entry(id).severity = sev.value; save(); refresh(); });
+      note.addEventListener('input', () => { entry(id).note = note.value; save(); refresh(); });
+      syncers.push(sync);
+      sync();
+    }
+    host.append(section);
+  }
+
+  const reviewer = document.getElementById('reviewer');
+  const date = document.getElementById('review-date');
+  reviewer.value = state._reviewer || '';
+  date.value = state._date || new Date().toISOString().slice(0, 10);
+  reviewer.addEventListener('input', () => { state._reviewer = reviewer.value; save(); refresh(); });
+  date.addEventListener('input', () => { state._date = date.value; save(); refresh(); });
+
+  const all = PARTS.flatMap((p) => p.tests.map((t) => ({ part: p.title.replace(/^Part \d — /, ''), id: t[0], todo: t[2], expect: t[3] })));
+  const clean = (s) => String(s).replace(/\s+/g, ' ').trim();
+
+  function report() {
+    const e = (id) => state[id] || {};
+    const passed = all.filter((t) => e(t.id).result === 'pass').length;
+    const failed = all.filter((t) => e(t.id).result === 'fail');
+    const notes = all.filter((t) => e(t.id).result !== 'fail' && clean(e(t.id).note || ''));
+    const lines = [
+      'CarCare UAT feedback — release 1.0.0-rc.1',
+      `Reviewer: ${clean(state._reviewer || '') || '(name)'}    Date: ${state._date || ''}`,
+      `Result: ${passed} passed, ${failed.length} failed, ${all.length - passed - failed.length} not tested (of ${all.length})`,
+      '',
+    ];
+    const header = ['Test #', 'Role', 'Result', 'How serious', 'What you expected', 'What happened'];
+    const rows = [...failed, ...notes].map((t) => [t.id, t.part, e(t.id).result === 'fail' ? 'Fail' : (e(t.id).result === 'pass' ? 'Pass (note)' : 'Note'), e(t.id).result === 'fail' ? e(t.id).severity || 'Normal' : '', clean(t.expect), clean(e(t.id).note || '') || '(no note)']);
+    if (rows.length) lines.push(header.join('\t'), ...rows.map((r) => r.join('\t')));
+    else lines.push(failed.length === 0 && passed === all.length ? 'All tests passed.' : 'No failures or notes recorded yet.');
+    return lines.join('\n');
+  }
+
+  function refresh() {
+    let p = 0, f = 0;
+    for (const t of all) { const r = (state[t.id] || {}).result; if (r === 'pass') p++; else if (r === 'fail') f++; }
+    document.getElementById('n-pass').textContent = p;
+    document.getElementById('n-fail').textContent = f;
+    document.getElementById('n-left').textContent = all.length - p - f;
+    document.getElementById('bar-pass').style.width = `${(p / all.length) * 100}%`;
+    document.getElementById('bar-fail').style.width = `${(f / all.length) * 100}%`;
+    for (const part of PARTS) {
+      const done = part.tests.filter((t) => (state[t[0]] || {}).result).length;
+      document.querySelector(`[data-part="${part.id}"]`).textContent = `${done} of ${part.tests.length} checked`;
+    }
+    document.getElementById('report-text').value = report();
+  }
+
+  async function copy(text, statusId, fallbackEl) {
+    const status = document.getElementById(statusId);
+    try {
+      await navigator.clipboard.writeText(text);
+      status.textContent = 'Copied. Paste it into your e-mail.';
+    } catch {
+      if (fallbackEl) { fallbackEl.focus(); fallbackEl.select?.(); }
+      status.textContent = 'Copy isn’t allowed here. The text is selected: press Ctrl+C (or long-press → Copy).';
+    }
+    setTimeout(() => { status.textContent = ''; }, 5000);
+  }
+  document.getElementById('copy-report').addEventListener('click', () => copy(report(), 'copy-status', document.getElementById('report-text')));
+  document.getElementById('copy-signoff').addEventListener('click', () => {
+    const sentence = document.getElementById('signoff').textContent;
+    copy(sentence, 'signoff-status', null);
+  });
+
+  const confirmBox = document.getElementById('clear-confirm');
+  document.getElementById('clear').addEventListener('click', () => { confirmBox.hidden = false; });
+  document.getElementById('clear-no').addEventListener('click', () => { confirmBox.hidden = true; });
+  document.getElementById('clear-yes').addEventListener('click', () => {
+    state = {};
+    save();
+    syncers.forEach((sync) => sync());
+    reviewer.value = '';
+    date.value = new Date().toISOString().slice(0, 10);
+    confirmBox.hidden = true;
+    refresh();
+  });
+
+  refresh();
+})();
+</script>
+</body>
+</html>
